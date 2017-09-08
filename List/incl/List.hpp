@@ -36,8 +36,7 @@ public:
     explicit List( const Allocator& al = Allocator() )
         : alloc(al), head(), tail()
         {
-            head.next = &tail;
-            tail.prev = &head;
+            link_nodes(&head, &tail);
         }
     explicit List( size_type count, const Allocator& al = Allocator() );
     // List( size_type count,
@@ -57,6 +56,10 @@ public:
     List& operator=( List&& other );
     List& operator=( std::initializer_list<T> init );
 
+/* member functions */
+    allocator_type get_allocator() const noexcept(Allocator())
+        { return alloc; }
+
 /* element access */
     reference front() noexcept
         { return head.next->value; }
@@ -69,7 +72,10 @@ public:
 
 /* capacity */
     bool empty() noexcept
-        { return head.next == tail.next == nullptr; }
+        { 
+            return head.next == &tail &&
+                   tail.prev == &head;
+        }
     size_type size() noexcept;
 
 /* iterators */
@@ -85,10 +91,23 @@ public:
         { return const_iterator(head.next); }
     const_iterator cend() const noexcept
         { return const_iterator(&tail); }
+    reverse_iterator rbegin() noexcept
+        { return reverse_iterator(end()); }
+    reverse_iterator rend() noexcept
+        { return reverse_iterator(begin()); }
+    const_reverse_iterator rbegin() const noexcept
+        { return reverse_iterator(end()); }
+    const_reverse_iterator rend() const noexcept
+        { return reverse_iterator(begin()); }
+    const_reverse_iterator crbegin() const noexcept
+        { return reverse_iterator(cend()); }
+    const_reverse_iterator crend() const noexcept
+        { return reverse_iterator(cbegin()); }
+    
 
 /* modifiers */
     void clear() noexcept
-        { free(); head.next = tail.prev = nullptr; }
+        { free(); }
     
     iterator insert(iterator pos, const T& value );
     iterator insert(iterator pos, T&& value);
@@ -97,15 +116,47 @@ public:
     iterator insert(iterator pos, InputIterator first, InputIterator last);
     iterator insert(iterator pos, std::initializer_list<T> init);
 
-protected:
     template<typename... Args>
-    Node* create_node(Node* p, Node* n, Args&&... args);
-    std::pair<Node*,Node*> alloc_n( size_type n, const T& val=T() );
+    iterator emplace( iterator pos, Args&&... args );
+
+    iterator erase( iterator pos );
+    iterator erase( iterator first, iterator last );
+
+    void push_back( const T& value );
+    void push_back( T&& value );
+    template<typename... Args>
+    void emplace_back( Args&&... args );
+    void pop_back() noexcept;
+    
+    void push_front( const T& value );
+    void push_front( T&& value );
+    template<typename... Args>
+    void emplace_front( Args&&... args );
+    void pop_front() noexcept;
+    
+    void resize( size_type count );
+    void resize( size_type count, const value_type& value );
+
+    void swap( List& other ) noexcept;
+
+protected:
+/* helper functions */
+    template<typename... Args>
+    Node* create_node(Args&&... args);
+
+    template<typename... Args>
+    std::pair<Node*,Node*> alloc_n( size_type n, Args&&... args);
+    
     template<typename Iter>
     std::pair<Node*,Node*> alloc_range(Iter begin, Iter end);
+    
+    void link_nodes(Node* pred, Node* target_a, Node* target_b, Node* succ);
+    void link_nodes(Node* pred, Node* succ);
+
     void free() noexcept;
 
 private:
+/* member variables */
     Allocator alloc;
     Node head;
     Node tail;
@@ -124,12 +175,12 @@ friend class List_iterator<T>;
 friend class List_const_iterator<T>;
 public:
     node() { }
-    explicit node(const T& val, node* p=nullptr, node* n=nullptr) noexcept
-        : prev(p), next(n), value(val)
+    explicit node( const T& val )
+        : prev(), next(), value(val)
         { }
     template<typename... Args>
-    node(node* p=nullptr, node* n=nullptr, Args&&... args)
-        : prev(p), next(n), value(std::forward<Args>(args)...)
+    node( Args&&... args )
+        : prev(), next(), value(std::forward<Args>(args)...)
         { }
 private:
     node* prev;
@@ -152,8 +203,8 @@ class List_iterator
                 >  */           
 {
     friend class List<T>;
-public:
     typedef List_iterator<T>                    self;
+public:
     typedef node<T>                             Node;
     typedef std::bidirectional_iterator_tag     iterator_category;
     typedef T                                   value_type;
@@ -224,8 +275,8 @@ class List_const_iterator
                 > */
 {
     friend class List<T>;
-public:
     typedef List_const_iterator<T>              self;
+public:
     typedef const node<T>                       Node;
     typedef List_iterator<T>                    iterator;
     typedef std::bidirectional_iterator_tag     iterator_category;
@@ -290,28 +341,32 @@ private:
 template<typename T, typename Allocator>
     template<typename... Args>
 inline typename List<T,Allocator>::Node*
-List<T,Allocator>::create_node(Node* p, Node* n, Args&&... args)
+List<T,Allocator>::create_node(Args&&... args)
 {
     Node* data = alloc.allocate(1);
-    alloc.construct(data, p, n, std::forward<Args>(args)...);
+    alloc.construct(data, std::forward<Args>(args)...);
     return data;
 }
 
 template<typename T, typename Allocator>
+    template<typename... Args>
 inline std::pair<node<T>*,node<T>*>
-List<T,Allocator>::alloc_n( size_type n, const T& val )
+List<T,Allocator>::alloc_n( size_type n, Args&&... args )
 {
     Node* data = alloc.allocate(1);
-    alloc.construct(data, val);
+    alloc.construct( data, std::forward<Args>(args)... );
     Node* pred = data;
     for(size_type i=1; i<n; ++i){
         Node* succ = alloc.allocate(1);
-        alloc.construct(succ, val, pred);
-        pred->next = succ;
+        // alloc.construct(succ, val, pred);
+        alloc.construct( succ, std::forward<Args>(args)... );
+        link_nodes(pred, succ);
+        // succ->prev = pred;
+        // pred->next = succ;
         pred = succ;
     }
-    data->prev = &head;
-    pred->next =  &tail;
+    // data->prev = &head;
+    // pred->next =  &tail;
     return std::make_pair(data, pred);
 }
 
@@ -325,13 +380,48 @@ List<T,Allocator>::alloc_range(Iter begin, Iter end)
     Node* pred = data;
     while(++begin != end){
         Node* succ = alloc.allocate(1);
-        alloc.construct(succ, *begin, succ);
-        pred->next = succ;
+        alloc.construct(succ, *begin);
+        link_nodes(pred, succ);
+        // succ->prev = pred;
+        // pred->next = succ;
         pred = succ;
     }
-    data->prev = &head;
-    pred->next = &tail;
+    // data->prev = &head;
+    // pred->next = &tail;
     return std::make_pair(data, pred);
+}
+
+/* template<typename T, typename Allocator>
+inline void
+List<T,Allocator>::link_nodes(Node* tgt_first, Node* tgt_last,
+                             Node* pred, Node* succ)
+{
+    tgt_first->prev = pred;
+    pred->next = tgt_first;
+
+    tgt_last->next = succ;
+    succ->prev = tgt_last;
+} */
+
+template<typename T, typename Allocator>
+inline void
+List<T,Allocator>::link_nodes( Node* pred,
+                               Node* target_a, Node* target_b,
+                               Node* succ )
+{
+    target_a->prev = pred;
+    target_b->next = succ;
+    succ->prev = target_b;
+    pred->next = target_a;
+}
+
+
+template<typename T, typename Allocator>
+inline void
+List<T,Allocator>::link_nodes(Node* pred, Node* succ)
+{
+    pred->next = succ;
+    succ->prev = pred;
 }
 
 template<typename T, typename Allocator>
@@ -356,8 +446,10 @@ inline List<T,Allocator>::List( size_type count, const Allocator& al )
     : alloc(al)
 {
     std::pair<Node*,Node*> data = alloc_n(count);
-    head.next = data.first;
-    tail.prev = data.second;
+    // link_nodes(data.first, data.second, &head, &tail);;
+    link_nodes(&head, data.first, data.second, &tail);
+    // head.next = data.first;
+    // tail.prev = data.second;
 }
 
 template<typename T, typename Allocator>
@@ -366,8 +458,11 @@ inline List<T,Allocator>::List( std::initializer_list<T> init
     : alloc(al)
 {
     std::pair<Node*,Node*> data = alloc_range(init.begin(), init.end());
-    head.next = data.first;
-    tail.prev = data.second;
+
+    // link_nodes(data.first, data.second, &head, &tail);
+    link_nodes(&head, data.first, data.second, &tail);
+    // head.next = data.first;
+    // tail.prev = data.second;
 }
 
 /* destructor */
@@ -375,7 +470,8 @@ template<typename T, typename Allocator>
 inline List<T,Allocator>::~List() noexcept
 {
     free();
-    head.next = tail.prev = nullptr;
+    // link_nodes(&tail, &head, &head, &tail);
+    link_nodes(&head, &tail, &tail, &head);
 }
 /* ------------------------------------------------------------------------- */
 
@@ -386,20 +482,26 @@ inline List<T,Allocator>::List( const List& other )
     : alloc(other.alloc)
 {
     std::pair<Node*,Node*> data = alloc_range(other.cbegin(), other.cend());
-    head.next = data.first;
-    tail.prev = data.second;
+    // link_nodes(data.first, data.second, &head, &tail);
+    link_nodes(&head, data.first, data.second, &tail); // better ?
+    // head.next = data.first;
+    // tail.prev = data.second;
 }
 
 template<typename T, typename Allocator>
 inline List<T,Allocator>::List( List&& other ) noexcept
     : alloc(std::move(other.alloc))
 {
-    head.next = other.head.next;
-    other.head.next->prev = &head;
-    tail.prev = other.tail.prev;
-    other.tail.prev->next = &tail;
+    // head.next = other.head.next;
+    // other.head.next->prev = &head;
+    // tail.prev = other.tail.prev;
+    // other.tail.prev->next = &tail;
+    // link_nodes(other.head.next, other.tail.prev, &head, &tail);
+    link_nodes(&head, other.head.next, other.tail.prev, &tail);
 
-    other.head.next = other.tail.prev = nullptr;
+    // other.head.next = other.tail.prev = nullptr;
+    // link_nodes(&other.tail, &other.head, &other.head, &other.tail);
+    link_nodes(&other.head, &other.tail, &other.tail, &other.head);
 }
 
 template<typename T, typename Allocator>
@@ -412,8 +514,10 @@ List<T,Allocator>::operator=( const List& other )
     free();
     std::pair<Node*,Node*> data = alloc_range(other.cbegin(), other.cend());
     alloc = other.alloc;
-    head.next = data.first;
-    tail.prev = data.second;
+    // link_nodes(data.first, data.second, &head, &tail);
+    link_nodes(&head, data.first, data.second, &tail);
+    // head.next = data.first;
+    // tail.prev = data.second;
     return *this;
 }
 
@@ -426,11 +530,17 @@ List<T,Allocator>::operator=( List&& other )
 
     free();
     alloc = std::move(other.alloc);
-    head.next = other.head.next;
-    other.head.next->prev = &head;
-    tail.prev = other.tail.prev;
-    other.tail.prev->next = &tail;
-    other.head.next = other.tail.prev = nullptr;
+    
+    // link_nodes(other.head.next, other.tail.prev, &head, &tail);
+    link_nodes(&head, other.head.next, other.tail.prev, &tail);
+
+    // head.next = other.head.next;
+    // other.head.next->prev = &head;
+    // tail.prev = other.tail.prev;
+    // other.tail.prev->next = &tail;
+    // other.head.next = other.tail.prev = nullptr;
+    // link_nodes(&other.tail, &other.head, &other.head, &other.tail);
+    link_nodes(&other.head, &other.tail, &other.tail, &other.head);
     return *this;
 }
 
@@ -440,8 +550,10 @@ List<T,Allocator>::operator=( std::initializer_list<T> init )
 {
     free();
     std::pair<Node*,Node*> data = alloc_range(init.begin(), init.end());
-    head.next = data.first;
-    tail.prev = data.second;
+    // link_nodes(data.first, data.second, &head, &tail);
+    link_nodes(&head, data.first, data.second, &tail);
+    // head.next = data.first;
+    // tail.prev = data.second;
     return *this;
 }
 /* ------------------------------------------------------------------------- */
@@ -468,18 +580,22 @@ template<typename T, typename Allocator>
 inline typename List<T,Allocator>::iterator
 List<T,Allocator>::insert(iterator pos, const T& value )
 {
-    Node* target = create_node(pos.current->prev, pos.current, value);
-    pos.current->prev->next = target;
-    pos.current->prev = target;
+    Node* target = create_node(value);
+    // link_nodes(target, target, pos.current->prev, pos.current);
+    link_nodes(pos.current->prev, target, target, pos.current);
+    // pos.current->prev->next = target;
+    // pos.current->prev = target;
     return iterator(target);
 }
 template<typename T, typename Allocator>
 inline typename List<T,Allocator>::iterator
 List<T,Allocator>::insert(iterator pos, T&& value)
 {
-    Node* target = create_node(pos.current->prev, pos.current, std::move(value));
-    pos.current->prev->next = target;
-    pos.current->prev = target;
+    Node* target = create_node(std::move(value));
+    // link_nodes(target, target, pos.current->prev, pos.current);
+    link_nodes(pos.current->prev, target, target, pos.current);
+    // pos.current->prev->next = target;
+    // pos.current->prev = target;
     return iterator(target);
 }
 template<typename T, typename Allocator>
@@ -487,10 +603,13 @@ inline typename List<T,Allocator>::iterator
 List<T,Allocator>::insert(iterator pos, size_type count, const T& value)
 {
     std::pair<Node*,Node*> data = alloc_n(count, value);
-    data.first->prev = pos.current->prev;
-    pos.current->prev->next = data.first;
-    pos.current->prev = data.second;
-    data.second->next = pos.current;
+    // link_nodes(data.first, data.second, pos.current->prev, pos.current);
+    link_nodes(pos.current->prev, data.first, data.second, pos.current);
+    // data.first->prev = pos.current->prev;
+    // pos.current->prev->next = data.first;
+    // pos.current->prev = data.second;
+    // data.second->next = pos.current;
+    
     return iterator(data.second);
 }
 template<typename T, typename Allocator>
@@ -499,10 +618,13 @@ inline typename List<T,Allocator>::iterator
 List<T,Allocator>::insert(iterator pos, InputIterator first, InputIterator last)
 {
     std::pair<Node*,Node*> data = alloc_range(first, last);
-    data.first->prev = pos.current->prev;
-    pos.current->prev->next = data.first;
-    pos.current->prev = data.second;
-    data.second->next = pos.current;
+    // link_nodes(data.first, data.second, pos.current->prev, pos.current);
+    link_nodes(pos.current->prev, data.first, data.second, pos.current);
+    // data.first->prev = pos.current->prev;
+    // pos.current->prev->next = data.first;
+    // pos.current->prev = data.second;
+    // data.second->next = pos.current;
+    
     return iterator(data.second);
 }
 template<typename T, typename Allocator>
@@ -510,13 +632,157 @@ inline typename List<T,Allocator>::iterator
 List<T,Allocator>::insert(iterator pos, std::initializer_list<T> init)
 {
     std::pair<Node*,Node*> data = alloc_range(init.begin(), init.end());
-    data.first->prev = pos.current->prev;
-    pos.current->prev->next = data.first;
-    pos.current->prev = data.second;
-    data.second->next = pos.current;
+    // link_nodes(data.first, data.second, pos.current->prev, pos.current);
+    link_nodes(pos.current->prev, data.first, data.second, pos.current);
+    // data.first->prev = pos.current->prev;
+    // pos.current->prev->next = data.first;
+    // pos.current->prev = data.second;
+    // data.second->next = pos.current;
     return iterator(data.second);
 }
-/* ------------------------------------------------------------------------- */
+
+// template<typename T, typename Allocator>
+//     template<typename... Args>
+// inline typename List<T,Allocator>::iterator
+// List<T,Allocator>::emplace( iterator pos, Args&&... args )
+// {
+//     Node* target = create_node( std::forward<Args>(args)... );
+//     link(pos.current->prev, target, target, pos.current);
+//     return iterator(target);
+// }
+
+template<typename T, typename Allocator>
+    template<typename... Args>
+inline typename List<T,Allocator>::iterator 
+List<T,Allocator>::emplace( iterator pos, Args&&... args )
+{
+    Node* target = create_node( std::forward<Args>(args)... );
+    link_nodes(pos.current->prev, target, target, pos.current);
+    return iterator(target);
+}
+
+template<typename T, typename Allocator>
+inline typename List<T,Allocator>::iterator 
+List<T,Allocator>::erase( iterator pos )
+{
+    Node* retval = pos.current->prev;
+    link_nodes(pos.current->prev, pos.current->next);
+    alloc.destroy( pos.current );
+    alloc.deallocate( pos.current, 1 );
+    return iterator(retval);
+}
+template<typename T, typename Allocator>
+inline typename List<T,Allocator>::iterator 
+List<T,Allocator>::erase( iterator first, iterator last )
+{
+    Node* retval = first.current->prev;
+    link_nodes(first.current->prev, last.current->next);
+    last.current->next = nullptr;
+    while( first.current != nullptr ){
+        Node* temp = first.current;
+        first.current = first.current->next;
+        alloc.deestroy( temp );
+        alloc.deallocate( temp, 1 );
+    }
+    return iterator( retval );
+}
+
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::push_back( const T& value )
+{
+    Node* target = create_node( value );
+    link_nodes( tail.prev, target, target, &tail );
+}
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::push_back( T&& value )
+{
+    Node* target = create_node( std::move(value) );
+    link_nodes( tail.prev, target, target, &tail );
+}
+template<typename T, typename Allocator>
+    template<typename... Args>
+inline void 
+List<T,Allocator>::emplace_back( Args&&... args )
+{
+    Node* target = create_node( std::forward<Args>(args)... );
+    link_nodes( tail.prev, target, target, &tail );
+}
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::pop_back() noexcept
+{
+    Node* temp = tail.prev;
+    temp->prev->next = &tail;
+    tail.prev = temp->prev;
+    alloc.destroy( temp );
+    alloc.deallocate( temp, 1 );
+}
+
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::push_front( const T& value )
+{
+    Node* target = create_node( value );
+    link_nodes(&head, target, target, head.next);
+}
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::push_front( T&& value )
+{
+    Node* target = create_node( std::move(value) );
+    link_nodes(&head, target, target, head.next);
+}
+template<typename T, typename Allocator>
+    template<typename... Args>
+inline void 
+List<T,Allocator>::emplace_front( Args&&... args )
+{
+    Node* target = create_node( std::forward<Args>(args)... );
+    link_nodes(&head, target, target, head.next);
+}
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::pop_front() noexcept
+{
+    Node* temp = head.next;
+    temp->next->prev = &head;
+    head.next = temp->next;
+    alloc.destroy( temp );
+    alloc.deallocate( temp, 1 );
+}
+
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::resize( size_type count )
+{
+    resize( count, value_type() );
+}
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::resize( size_type count, const value_type& value )
+{
+    size_type cur_size = size();
+    if( count > cur_size ){
+        insert( end(), (cur_size - count), value );
+    }
+    else{
+        while( count < cur_size-- ){
+            pop_back();
+        }
+    }
+}
+
+template<typename T, typename Allocator>
+inline void 
+List<T,Allocator>::swap( List& other ) noexcept
+{
+    using std::swap;
+    swap( alloc, other.alloc );
+    swap( head, other.head );
+    swap( tail, other.tail );
+}
 
 /* ------------------------------------------------------------------------- */
 
