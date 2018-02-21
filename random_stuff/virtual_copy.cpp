@@ -1,4 +1,6 @@
 #include <iostream>
+#include <vector>
+#include <memory>
 
 
 class Base
@@ -10,16 +12,16 @@ class Base
 public:
     Base() = default;
 
-    std::unique_ptr<Base> clone() const;
+    std::unique_ptr<Base> clone() const
     {
         return std::unique_ptr<Base>(do_clone());
     }
 };
 
-class Derived
+class Derived : public Base
 {
 private:
-    virtual Derived* do_clone() const override
+    Derived* do_clone() const override
     {
         return new Derived(*this);
     }
@@ -28,12 +30,12 @@ public:
 
     std::unique_ptr<Derived> clone() const
     {
-        return do_clone();
+        return std::unique_ptr<Derived>(do_clone());
     }
-}
+};
 
 
 int main()
 {
-
+    
 }
