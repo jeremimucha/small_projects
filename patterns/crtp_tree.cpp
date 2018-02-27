@@ -71,7 +71,11 @@ private:
     // convenience method for CRTP
     Derived& derived()
     {
-        return *static_cast<Derived*>(this);
+        return static_cast<Derived&>(*this);
+    }
+    const Derived& derived() const
+    {
+        return static_cast<const Derived&>(*this);
     }
 
     void dispatch_node(TreeNode* node)
