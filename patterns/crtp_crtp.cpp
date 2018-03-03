@@ -58,7 +58,7 @@ int main()
     sens.square();
     std::cout << "sens.square() = " << sens.get_value() << std::endl;
 
-    const csens = Sensitivity(42);
+    const auto csens = Sensitivity(42);
     std::cout << "csens.get_squared() = " << csens.get_squared() << std::endl;
     // won't compile
     // csens.square();

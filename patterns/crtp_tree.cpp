@@ -18,17 +18,8 @@ struct TreeNode
     TreeNode* right{nullptr};
 };
 
-class IVisitor
-{
-public:
-    virtual ~IVisitor() = default;
-    virtual void visit_preorder(TreeNode*) = 0;
-    virtual void visit_inorder(TreeNode*) = 0;
-    virtual void visit_postorder(TreeNode*) = 0;
-};
-
 template<typename Derived>
-class GenericVisitor : public IVisitor
+class GenericVisitor
 {
 public:
     void visit_preorder(TreeNode* node)
@@ -121,21 +112,24 @@ protected:
 
 int main()
 {
-    std::vector<std::unique_ptr<IVisitor>> visitors;
-    visitors.push_back( std::make_unique<DefaultVisitor>() );
-    visitors.push_back( std::make_unique<SpecialVisitor>() );
-    visitors.push_back( std::make_unique<BlueVisitor>() );
 
     auto tn1 = TreeNode(TreeNode::BLUE);
     auto tn2 = TreeNode(TreeNode::RED);
     auto tn3 = TreeNode(TreeNode::BLUE, &tn1, &tn2);
-    for( auto& visitor : visitors ){
-        std::cout << "visiting preorder..." << std::endl;
-        visitor->visit_preorder(&tn3);
-        std::cout << "visiting inorder..." << std::endl;
-        visitor->visit_inorder(&tn3);
-        std::cout << "visiting postorder..." << std::endl;
-        visitor->visit_postorder(&tn3);
-        std::cout << std::endl;
-    }
+
+    auto default_visitor = DefaultVisitor{};
+    auto special_visitor = SpecialVisitor{};
+    auto blue_visitor = BlueVisitor{};
+
+    default_visitor.visit_preorder(&tn3);
+    default_visitor.visit_inorder(&tn3);
+    default_visitor.visit_postorder(&tn3);
+
+    special_visitor.visit_preorder(&tn3);
+    special_visitor.visit_inorder(&tn3);
+    special_visitor.visit_postorder(&tn3);
+
+    blue_visitor.visit_preorder(&tn3);
+    blue_visitor.visit_inorder(&tn3);
+    blue_visitor.visit_postorder(&tn3);
 }
