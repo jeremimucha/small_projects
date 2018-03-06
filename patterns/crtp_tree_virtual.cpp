@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 #include <cassert>
+#include <boost/iterator/iterator_facade.hpp>
 
 
 struct TreeNode
