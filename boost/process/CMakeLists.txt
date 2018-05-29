@@ -26,7 +26,7 @@ foreach( target ${target_sources} )
   message( STATUS "Executable: ${fname}" )
   add_executable( ${fname} ${target} )
   target_compile_options( ${fname} PUBLIC
-    -Wall -Wextra -pedantic -Werror
+    -Wall -Wextra -pedantic
     -fconcepts
   )
   target_link_libraries( ${fname}

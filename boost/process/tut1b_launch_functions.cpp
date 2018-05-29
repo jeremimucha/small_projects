@@ -8,6 +8,16 @@ namespace bp = boost::process;
 namespace fs = boost::filesystem;
 using namespace std::chrono_literals;
 
+/**
+ * There are multiple ways of passing arguments to the child process
+ * overloading:
+ * system("grep -c false /etc/passwd"); //cmd style
+ * system("grep", "-c", "false", "/etc/passwd"); //exe-/args-
+ * explicitly set `exe` and `args` arguments
+ * system(cmd="grep -c false /etc/passwd"); //cmd style
+ * system(exe="grep", args={"-c", "false", "/etc/passwd"}); //exe-/args-
+ */
+
 int main(/* int argc, char* argv[] */)
 {
 // calling bp::system() will wait untill the child process is completed (blocking call)

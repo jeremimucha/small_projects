@@ -15,8 +15,8 @@ using gsl::ensure_z;
 // wxBoxSizer(int orient)
 // wxSizerItem* Add( wxWindow* window   // the widged being added to the sizer
 //                 , int proportion = 0 // how will resizing affect the widget
-//                 , int flag = 0       // 
-//                 , int border = 0
+//                 , int flag = 0       // flags controlling the alignment and borders
+//                 , int border = 0     // border size in pixels
 //                 )
 
 class GotoClass : public wxFrame
@@ -68,7 +68,7 @@ GotoClass::GotoClass(std::string_view title)
 
     wxBoxSizer* hbox4{new wxBoxSizer{wxHORIZONTAL}};
     wxCheckBox* cb1{new wxCheckBox{panel, wxID_ANY, "Case Sensitive"}};
-    hbox4->Add(cb1);
+    hbox4->Add(cb1, wxLEFT, 10);
     wxCheckBox* cb2{new wxCheckBox{panel, wxID_ANY, "Nested Classes"}};
     hbox4->Add(cb2, wxLEFT, 10);
     wxCheckBox* cb3{new wxCheckBox{panel, wxID_ANY, "Non-project Classes"}};
