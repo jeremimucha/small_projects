@@ -21,8 +21,8 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 ###############################
 # manually linking a library - point cmake to the exact path
-add_library(stdc++fs UNKNOWN IMPORTED)
-set_property(TARGET stdc++fs PROPERTY IMPORTED_LOCATION "C:/Projects/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/7.3.0/libstdc++fs.a")
+# add_library(stdc++fs UNKNOWN IMPORTED)
+# set_property(TARGET stdc++fs PROPERTY IMPORTED_LOCATION "C:/Projects/msys64/mingw64/lib/gcc/x86_64-w64-mingw32/7.3.0/libstdc++fs.a")
 
 file( GLOB target_sources RELATIVE "${PROJECT_SOURCE_DIR}"
       "${PROJECT_SOURCE_DIR}/*.cpp" )
@@ -35,10 +35,11 @@ foreach( target ${target_sources} )
     # -fprofile-arcs -ftest-coverage
     -Wall -Wextra -pedantic -Werror
     -fconcepts
+    -lstdc++fs
   )
   target_link_libraries( ${fname}
 #    ${Boost_LIBRARIES}
-    stdc++fs
+    # stdc++fs
    )
   #  get_target_property(defs ${fname} COMPILE_DEFINITIONS)
   #  get_target_property(flags ${fname} COMPILE_FLAGS)

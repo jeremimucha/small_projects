@@ -31,15 +31,14 @@ struct my_handler : public ex::handler, ex::require_io_context {
  * thourgh ex::async_handler;
  * ex::async_handler implies ex::require_io_context
  */
-struct my_async_handler : public ex::async_handler {
+struct my_async_handler : ex::async_handler {
     template<typename Executor>
-    std::function<void(int,const std::error_code&)> on_exit_handler(Executor& exec)
+    decltype(auto) on_exit_handler(Executor& exec)
     {
-        // auto handler = this->handler;
         return [this](int exit_code, const std::error_code& ec)
                 {
-                    std::cout << "hello world, I exited with " << exit_code << std::endl;
-                    std::cout << "error_code = " << ec << std::endl;
+                    std::cerr << "hello world, I exited with " << exit_code << std::endl;
+                    std::cerr << "error_code = " << ec << std::endl;
                 };
     }
 };

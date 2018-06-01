@@ -19,7 +19,7 @@ struct my_handler : public ex::handler
     {
         std::cout << "Setting up the child process: " << exec.exe << std::endl;
         std::cout << "setting fake error..." << std::endl;
-        std::error_code ec = {42, std::system_category{}};
+        std::error_code ec{42, std::system_category()};
         exec.set_error(ec, "a fake error");
     }
 
@@ -39,8 +39,10 @@ struct my_handler : public ex::handler
 
 int main()
 {
-    auto ch = bp::child{bp::search_path("g++"), "--version", my_handler{}};
+    std::error_code ec;
+    auto ch = bp::child{bp::search_path("g++"), "--version", my_handler{}, ec};
     ch.wait();
+    if(ec)
+        std::cerr << "child process failed with an exit code ec = " << ec << std::endl;
     std::cerr << "child exit code = " << ch.exit_code() << std::endl;
-
 }
