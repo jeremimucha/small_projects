@@ -8,6 +8,7 @@
 #include <string>
 #include <typeinfo>
 #include <cassert>
+#include <boost/type_index.hpp>
 #if !defined(NDEBUG)
 #define GSL_THROW_ON_CONTRACT_VIOLATION
 #include <gsl/gsl>
@@ -42,7 +43,7 @@ class BadProbability : public std::logic_error
 { 
 public:
     explicit BadProbability(long double v)
-        : std::logic_error( std::to_string(v) )
+        : std::logic_error( "BadProbability exception, got value: " + std::to_string(v) )
         { }
 };
 
@@ -52,16 +53,18 @@ constexpr Probability operator "" _prob(long double v)
     // literals never represent negative values - no need to check for v < 0.0
 }
 
-
+using boost::typeindex::type_id_with_cvr;
 int main()
 try{
     // std::basic_string<wchar_t>
     auto s1 = "String literal"s;        // this is a std::string;
     auto s2 = L"Wide string literal"s;  // this is a std::wstring;
     auto s3 = std::basic_string<wchar_t>(L"This is a very explicit wstring");
-    cout << "s1:\n\t" << s1 << "\n\ttypeid " << typeid(s1).name() << endl;
-    wcout << L"s2:\n\t" << s2 << L"\n\ttypeid " << typeid(s2).name() << endl;
-    wcout << L"s3:\n\t" << s3 << L"\n\ttypeid " << typeid(s3).name() << endl;
+    cout << "s1:\n\t" << s1 << "\n\ttypeid " << type_id_with_cvr<decltype(s1)>().pretty_name() << endl;
+    wcout << L"s2:\n\t" << s2 << L"\n\ttypeid ";
+    cout << type_id_with_cvr<decltype(s2)>().pretty_name() << endl;
+    wcout << L"s3:\n\t" << s3 << L"\n\ttypeid ";
+    cout << type_id_with_cvr<decltype(s3)>().pretty_name() << endl;
 
     cout << "\nUser defined literals\n" << "Probability\n" << endl;
     
@@ -80,8 +83,8 @@ try{
     auto prob6 = 0.6_prob;
         cout << prob6 << endl;
 
-    auto prob7 = Probability{1.7};
-        cout << prob7 << endl;
+    // auto prob7 = Probability{1.7}; // runtime error
+    //     cout << prob7 << endl;
 }
 catch( const std::exception& e )
 {
